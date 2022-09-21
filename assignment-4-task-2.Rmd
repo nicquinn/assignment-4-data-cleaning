@@ -1,0 +1,63 @@
+---
+title: "assignment-4-task-2"
+author: "nicquinn"
+date: "2022-09-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+```
+
+## R Markdown
+
+First, the opportunity to read in the data set including occupational involvement between genders in 1870.
+
+```{r}
+
+occupation <- read_csv("occupation-1870.csv")
+```
+
+This data set can be gathered with the tidyr package tool, pivot_longer. The industry column was separated to reflect the different genders.
+
+```{r}
+longerData <- occupation %>%
+  pivot_longer(c(2:11), names_to = "industry", values_to = "people_count") %>%
+  separate(industry, into = c("industry", "gender"), "[.]") %>%
+  rename(area_name = `Area name`) %>%
+  rename(total_population = Total.Population)
+
+print(head(longerData))
+
+```
+
+This data was then cleaned to make it easier to represent on a scatter plot.
+
+```{r}
+graphData <- longerData %>%
+  select(industry, gender, people_count) %>%
+  group_by(industry, gender) %>%
+  summarise(industry_total = sum(people_count))
+
+print(head(graphData))
+```
+
+Now, this data can be graphed utilizing the GGPLOT package from the tidyverse.
+
+```{r}
+graph1 <- ggplot(graphData, aes(industry, industry_total))
+
+graph1 + geom_point(aes(colour = factor(gender))) +
+  labs(x = "Occupation", y = "Amount of People Involved",
+       title = "Occupational Gender Split in 1870") +
+  theme(plot.title=element_text(hjust=0.5)) +
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE), breaks = seq(0, 6000000, len = 6))
+ 
+  
+  
+```
+
+\ It is now graphically clear the variance between genders in each occupation. 
