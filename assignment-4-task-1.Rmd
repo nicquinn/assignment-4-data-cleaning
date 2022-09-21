@@ -1,0 +1,141 @@
+---
+title: "assignment-4-task-1"
+author: "nicquinn"
+date: "2022-09-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+```
+
+## R Markdown
+
+Going to begin by reading in the CSV file of baseball pitch data. A data set of only curve balls was gathered, followed by seperation of left and right hand pitchers. It would be interesting to see if there are similar percentages of success between handedness. 
+
+```{r}
+pitch <- read_csv("pitch.csv")
+
+curveBall <- pitch %>%
+  filter(pitch_type == "CU") %>%
+  drop_na(pitch_type)
+
+curveBallRight <- pitch %>%
+  filter(pitcher_hand == "R" & pitch_type == "CU") %>%
+  filter(action_result == "C" | action_result == "X" | action_result == "S") %>%
+  arrange(spin_rate) %>%
+  drop_na()
+  
+
+curveBallLeft <- pitch %>%
+  filter(pitcher_hand == "L" & pitch_type == "CU") %>%
+  filter(action_result == "C" | action_result == "X" | action_result == "S") %>%
+  arrange(spin_rate) %>%
+  drop_na()
+```
+
+At first glance, I am interested in the average spin rate of the curve balls that are thrown, separated by the resulting action of the pitch. It looks like there is a correlation between spin rate speed and the resulting action. Even if it is not the causation, it appears that slower spin rate results in more "B (Ball)" while the fastest spin rates result in "F(Foul)". The average spin rate of each type of strike occurs between 3131 and 3136. 
+
+
+```{R}
+averageSpeed <- curveBall %>%
+  group_by(action_result) %>%
+  summarise(action_spin_rate = mean(spin_rate)) %>%
+  arrange(action_spin_rate)
+
+print(averageSpeed)
+
+```
+
+```{r}
+graph2 <- ggplot(averageSpeed, aes(factor(action_result, levels = c("B", "C", "S", "X", "F")), action_spin_rate))
+
+graph2 + geom_point() +
+  labs( x = "Resulting Action", y = "Average Spin Rate",
+        title = "Average Spin Rate of Each Action")
+```
+
+\ Now it is attempted to find the average spin rate of the curve balls thrown by each individual player. Included, is the proportion of each outcome for each player. 
+
+```{r}
+playerAvg <- curveBall %>%
+  group_by(playerid) %>%
+  summarise(individual_avg = mean(spin_rate))
+
+playerCount <- curveBall %>%
+  group_by(playerid) %>%
+  count(action_result) %>%
+  arrange(desc(n), .by_group = TRUE)
+
+propAction <- playerCount %>%
+  group_by(playerid) %>%
+  mutate(total = sum(n)) %>%
+  mutate(percentage = round(n/total * 100))
+
+
+```
+
+With the knowledge of each individual player's average spin rate on their curve balls, it is attempted to find the amount of strike successes for each player. A join is utilized to view amount of strikes in comparison to average spin rate for each player.
+
+```{R}
+playerStrikes <- playerCount %>%
+  filter(action_result == "S" | action_result == "X" | action_result == "C") %>%
+  group_by(playerid) %>%
+  summarise(total = sum(n)) %>%
+  arrange(desc(total)) %>%
+  mutate(total_strike_count = sum(total))
+
+speedToStrikes <- playerStrikes %>%
+  inner_join(playerAvg, by = c("playerid" = "playerid"))
+  
+```
+
+Again, there appears to be a positive correlation between the average spin rate of each player's curve ball and their amount of strike successes.
+
+```{r}
+graph <- ggplot(speedToStrikes, aes(total, individual_avg))
+
+graph + geom_point() +
+  labs(x = "Total Strikes Per Player", y = "Avg Spin Rate of Each Player",
+       title = "Throwing Curveballs") +
+  theme(plot.title = element_text(hjust=0.5))
+
+```
+
+
+\ This data is positively skewed, and thus, I have deduced from this data that 49% of curve ball strike successes are thrown with an average spin rate within +1 (plus 1) standarad deviation from the mean. 
+```{r}
+successfulCurves <- playerAvg %>%
+  inner_join(playerStrikes, by = c("playerid" = "playerid")) %>%
+  mutate(mean = sum(individual_avg)/length(individual_avg)) %>%
+  mutate(st_dev = sd(individual_avg)) %>%
+  filter(individual_avg > mean & individual_avg < (mean+st_dev)) %>%
+  mutate(within_param = sum(total)) %>%
+  mutate(percentage = round((within_param/total_strike_count)*100)) %>%
+  arrange(desc(total))
+
+meanSpinRate <- 3077.607
+st_devSpinRate <- 60.91268
+
+```
+
+And now we will graphically represent the range of successful curve balls.
+
+```{r}
+graph3 <- ggplot(successfulCurves, aes(total, individual_avg))
+
+graph3 + geom_point() +
+  labs(x = "Total Number of Strikes", y = "Average Spin Rate of Curve Ball",
+       title = "Sweet Spot of Spin Rate",
+       subtitle = "Curve Balls") +
+  theme(plot.title = element_text(hjust=0.5), plot.subtitle = element_text(hjust=0.5))
+
+```
+
+\ A curve ball thrown with a spin rate between 3077.607 and 3138.52 is 49% successful, resulting in a strike. 
+
+
+
+
